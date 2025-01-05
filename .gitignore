@@ -21,3 +21,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### app ###
+.data
+.raw_scrape
+.cleaned_scrape
+
