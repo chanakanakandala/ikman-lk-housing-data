@@ -6,10 +6,9 @@ import pandas as pd
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(BASE_DIR, "..", "assets")
-DATA_DIR = os.path.join(BASE_DIR, "..", "data")
 RAW_SCRAPE_DIR = os.path.join(BASE_DIR, "..", "raw_scrape")
 CLEANED_SCRAPE_DIR = os.path.join(BASE_DIR, "..", "cleaned_scrape")
-HISTORY_FILE = os.path.join(DATA_DIR, "..", "scrape_history.json")
+HISTORY_FILE = os.path.join(BASE_DIR, "..", "data/scrape_history.json")
 LOCATIONS_FILE = os.path.join(ASSETS_DIR, "locations.json")
 
 

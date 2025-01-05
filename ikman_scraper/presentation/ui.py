@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 import os
 
+from ikman_scraper.const.const import DEDUPLICATION_THRESHOLD
 # Domain or data layer references
 from ikman_scraper.data.data_access import load_history, load_locations
 from ikman_scraper.services.scrape_service import scrape_location, record_scrape_summary
@@ -111,7 +112,7 @@ def main():
             dt_start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
             dt_end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
 
-            result = cleanup_duplicates(dt_start, dt_end)
+            result = cleanup_duplicates(dt_start, dt_end, DEDUPLICATION_THRESHOLD)
             if result["success"]:
                 st.success(result["message"])
                 if os.path.exists(result["file"]):

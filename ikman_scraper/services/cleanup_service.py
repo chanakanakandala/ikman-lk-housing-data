@@ -3,6 +3,8 @@ import pandas as pd
 import re
 from datetime import datetime
 from thefuzz import fuzz
+import unicodedata
+import regex
 from ..data.data_access import load_history, read_excel_file, write_excel_file, CLEANED_SCRAPE_DIR
 
 
@@ -31,17 +33,34 @@ def find_excel_files_for_range(start_date, end_date):
 
 
 def normalize_title(title: str) -> str:
-    """Lowercase, strip punctuation/extra spaces, etc."""
+    """
+    Normalize a title for multi-language support (e.g. English, Sinhala).
+    Steps:
+      1) Unicode normalize (NFKC) to handle different forms (e.g. full-width, half-width).
+      2) Remove characters not in letters, digits, or whitespace.
+      3) Collapse multiple spaces into one.
+      4) Lowercase and strip leading/trailing spaces.
+    """
     if not isinstance(title, str):
         return ""
-    title = title.lower()
-    title = re.sub(r"[^\w\s]", "", title)
-    title = re.sub(r"\s+", " ", title)
-    title = title.strip()
+
+    # 1) Normalize unicode to NFKC
+    title = unicodedata.normalize("NFKC", title)
+
+    # 2) Keep letters (\p{L}), digits (\p{N}), or whitespace (\s); replace others with a space
+    #    This allows Sinhala, Tamil, Devanagari, Arabic, etc. to remain
+    title = regex.sub(r"[^\p{L}\p{N}\s]+", " ", title)
+
+    # 3) Collapse multiple spaces
+    title = regex.sub(r"\s+", " ", title)
+
+    # 4) Strip and lowercase
+    title = title.strip().lower()
+
     return title
 
 
-def fuzzy_drop_duplicates(df, threshold=80):
+def fuzzy_drop_duplicates(df, threshold=95):
     """
     Remove duplicates based on fuzzy string matching of 'title_normalized'.
     Assumes DataFrame is sorted by 'Date' descending.
@@ -64,7 +83,7 @@ def fuzzy_drop_duplicates(df, threshold=80):
     return pd.DataFrame(final_rows)
 
 
-def cleanup_duplicates(start_date, end_date, threshold=80):
+def cleanup_duplicates(start_date, end_date, threshold):
     """
     1) Collect all Excel files in [start_date, end_date].
     2) Merge them, sort by Date DESC.
