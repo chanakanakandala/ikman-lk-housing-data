@@ -23,9 +23,9 @@ Open the browser and go to http://localhost:8501
 
 ## Scrapped Data
 
-Scrapped data is saved in the data[raw_scrape](raw_scrape) folder as a Excel file.
+Scrapped data is saved in the data [raw_scrape](raw_scrape) folder as a Excel file.
 
 ## Data Cleaning
 
 Data cleaning is done using the fuzzy matching algorithm to match the scraped data with the original data.Use title to
-match the data.
+match the data.Data cleaning code is in the [cleaned_scrape](cleaned_scrape) folder.

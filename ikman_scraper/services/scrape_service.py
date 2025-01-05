@@ -73,7 +73,7 @@ def scrape_location(location_dict, log_area):
     location_slug = location_dict["slug"]
     location_id = location_dict["id"]
 
-    skip_keywords = ["Single", "තනි තට්ටු", "තනිමහල්"]
+    skip_keywords = ["Single", "තනි තට්ටු", "තනිමහල්", "තනිමහළේ"]
     ads_scraped = 0
     pages_scraped = 0
 
