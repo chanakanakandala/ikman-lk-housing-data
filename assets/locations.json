@@ -18,5 +18,25 @@
     "id": 1551,
     "name": "Pannipitiya",
     "slug": "pannipitiya"
+  },
+  {
+    "id": 2311,
+    "name": "Katunayake",
+    "slug": "katunayake"
+  },
+  {
+    "id": 2370,
+    "name": "Seeduwa",
+    "slug": "seeduwa"
+  },
+  {
+    "id": 2355,
+    "name": "Ragama",
+    "slug": "ragama"
+  },
+  {
+    "id": 1590,
+    "name": "Negombo",
+    "slug": "negombo"
   }
 ]
