@@ -1,8 +1,61 @@
 import os
-from datetime import datetime
 import pandas as pd
-
+import re
+from datetime import datetime
+from thefuzz import fuzz
 from ..data.data_access import load_history, read_excel_file, write_excel_file
+
+
+def normalize_title(title: str) -> str:
+    """
+    Convert to lowercase, remove punctuation, trim extra spaces, etc.
+    Example:
+      "   Beautiful House!! " -> "beautiful house"
+      "House, For SALE!!!"   -> "house for sale"
+    """
+    if not isinstance(title, str):
+        return ""
+    # Lowercase
+    title = title.lower()
+    # Remove punctuation (keep letters/digits/spaces)
+    title = re.sub(r"[^\w\s]", "", title)
+    # Collapse multiple spaces
+    title = re.sub(r"\s+", " ", title)
+    # Trim
+    title = title.strip()
+    return title
+
+
+def fuzzy_drop_duplicates(df, threshold=80):
+    """
+    Takes a DataFrame sorted by 'Date' descending (latest first),
+    and removes duplicates using fuzzy string matching on 'title_normalized'.
+
+    threshold=80 means 80% similarity => skip as duplicate.
+
+    Returns a new DataFrame with only unique titles by fuzzy match.
+    """
+    final_rows = []
+    final_titles = []  # store 'title_normalized' strings of accepted rows
+
+    for _, row in df.iterrows():
+        t_norm = row["title_normalized"]
+        # Check if it is "similar enough" to any existing title
+        is_duplicate = False
+        for existing_t in final_titles:
+            ratio = fuzz.ratio(t_norm, existing_t)
+            if ratio >= threshold:
+                # It's considered the "same" title, so skip
+                is_duplicate = True
+                break
+
+        if not is_duplicate:
+            final_rows.append(row)
+            final_titles.append(t_norm)
+
+    # Build a new DataFrame from final_rows
+    dedup_df = pd.DataFrame(final_rows)
+    return dedup_df
 
 
 def find_excel_files_for_range(start_date, end_date):
@@ -29,14 +82,19 @@ def find_excel_files_for_range(start_date, end_date):
     return valid_paths
 
 
-def cleanup_duplicates(start_date, end_date):
+def cleanup_duplicates(start_date, end_date, threshold=80):
     """
-    Merge all excel files in [start_date, end_date], remove duplicates by 'Title',
-    keep latest by 'Date', save to cleaned_scrape/...
-    Returns a dict with {success, message, file} for the UI to display.
-    """
+    1) Merge Excel files from [start_date, end_date].
+    2) Sort by Date (descending).
+    3) Normalize title -> "title_normalized".
+    4) Fuzzy deduplicate with fuzzy_drop_duplicates(...).
+    5) Keep the newest record for each fuzzy-similar Title.
+    6) Save to 'cleaned_scrape/' folder as cleaned_<start>_to_<end>.xlsx
 
-    # 1) Gather Excel files from the range
+    threshold => fuzzy similarity cutoff.
+      e.g. 80 means if the ratio is >=80, treat them as duplicates.
+    Returns {success, message, file}.
+    """
     excel_files = find_excel_files_for_range(start_date, end_date)
     if not excel_files:
         return {
@@ -47,11 +105,10 @@ def cleanup_duplicates(start_date, end_date):
 
     combined_df = pd.DataFrame()
 
-    # 2) Read and combine
+    # 1) Read all files
     for fpath in excel_files:
         df = read_excel_file(fpath)
-        if df is not None:
-            # Make sure Date column is datetime
+        if df is not None and not df.empty:
             if "Date" in df.columns:
                 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
             combined_df = pd.concat([combined_df, df], ignore_index=True)
@@ -63,11 +120,11 @@ def cleanup_duplicates(start_date, end_date):
             "file": ""
         }
 
-    # 3) Sort by 'Date' descending so newest is first
+    # 2) Sort descending by date, so the newest records come first
     if "Date" in combined_df.columns:
         combined_df.sort_values(by="Date", ascending=False, inplace=True)
 
-    # 4) Remove duplicates by "Title"
+    # 3) If there's no Title column, we can't proceed
     if "Title" not in combined_df.columns:
         return {
             "success": False,
@@ -75,31 +132,32 @@ def cleanup_duplicates(start_date, end_date):
             "file": ""
         }
 
-    combined_df.drop_duplicates(subset=["Title"], keep="first", inplace=True)
-    final_count = len(combined_df)
+    # 4) Create a normalized title column
+    combined_df["title_normalized"] = combined_df["Title"].apply(normalize_title)
 
-    # 5) Save to 'cleaned_scrape/'
-    # Name the file, e.g.: cleaned_YYYY-MM-DD_to_YYYY-MM-DD.xlsx
+    # 5) Fuzzy deduplicate
+    dedup_df = fuzzy_drop_duplicates(combined_df, threshold=threshold)
+    final_count = len(dedup_df)
+
+    # 6) Save to cleaned_scrape folder
     start_str = start_date.strftime("%Y-%m-%d")
     end_str = end_date.strftime("%Y-%m-%d")
     filename = f"cleaned_{start_str}_to_{end_str}.xlsx"
-    out_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "..",
-        "cleaned_scrape",
-        filename
-    )
+
+    out_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "cleaned_scrape")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, filename)
 
     try:
-        write_excel_file(combined_df, out_path)
+        write_excel_file(dedup_df, out_path)
         return {
             "success": True,
-            "message": f"Cleanup complete. {final_count} records in final file.",
+            "message": f"Fuzzy cleanup done. {final_count} records remain.",
             "file": out_path
         }
     except Exception as e:
         return {
             "success": False,
-            "message": f"Error while saving cleaned file: {str(e)}",
+            "message": f"Error saving file: {str(e)}",
             "file": ""
         }
